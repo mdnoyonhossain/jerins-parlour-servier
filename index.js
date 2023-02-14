@@ -14,40 +14,60 @@ app.use(express.json());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.n3a0m.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
-async function run(){
-    try{
+async function veryfyJWT(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send('unAuthorized Access');
+    }
+
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            return res.status(403).send({ message: 'forbidden Access' });
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
+
+async function run() {
+    try {
         const servicesProductCollection = client.db('jerinsParlor').collection('services');
         const bookingCollection = client.db('jerinsParlor').collection('bookings');
         const reviewCollection = client.db('jerinsParlor').collection('reviews');
         const usersCollection = client.db('jerinsParlor').collection('users');
-        
-        app.get('/services', async(req, res) => {
+
+        app.get('/services', async (req, res) => {
             const query = {};
             const services = await servicesProductCollection.find(query).toArray();
             res.send(services);
         });
 
-        app.get('/homeServices', async(req, res) => {
+        app.get('/homeServices', async (req, res) => {
             const query = {};
             const services = await servicesProductCollection.find(query).limit(3).toArray();
             res.send(services);
         });
-        
+
         app.get('/services/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const services = await servicesProductCollection.findOne(query);
             res.send(services);
         });
 
-        app.get('/bookings', async (req, res) => {
+        app.get('/bookings', veryfyJWT, async (req, res) => {
             const email = req.query.email;
-            const query = {email: email};
+            const decodeEmail = req.decoded.email;
+            if (email !== decodeEmail) {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+            const query = { email: email };
             const bookings = await bookingCollection.find(query).toArray();
             res.send(bookings);
         });
 
-        app.post('/bookings', async(req, res) => {
+        app.post('/bookings', async (req, res) => {
             const booking = req.body;
             const result = await bookingCollection.insertOne(booking);
             res.send(result);
@@ -61,13 +81,13 @@ async function run(){
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
-            const query = {email: email};
+            const query = { email: email };
             const users = await usersCollection.findOne(query);
-            if(users){
-                const token = jwt.sign({email}, process.env.ACCESS_TOKEN, {expiresIn: '1h'});
-                return res.send({accessToken: token});
+            if (users) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
+                return res.send({ accessToken: token });
             }
-            res.status(401).send({accessToken: 'unAuthorized'});
+            res.status(401).send({ accessToken: 'unAuthorized' });
         })
 
         app.post('/users', async (req, res) => {
@@ -76,8 +96,25 @@ async function run(){
             res.send(users);
         });
 
+        app.put('/users/admin', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email };
+            const users = await usersCollection.findOne(query);
+            if (!users) {
+                return res.status(401).send({message: 'First Create this email account.'})
+            }
+            const optios = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    role: 'admin'
+                }
+            }
+            const result = await usersCollection.updateOne(query, updatedDoc, optios);
+            res.send(result);
+        });
+
     }
-    finally{
+    finally {
 
     }
 }
