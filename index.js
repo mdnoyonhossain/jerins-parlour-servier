@@ -17,7 +17,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function veryfyJWT(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-        return res.status(401).send('unAuthorized Access');
+        return res.status(401).send('UnAuthorized Access');
     }
 
     const token = authHeader.split(' ')[1];
@@ -88,7 +88,14 @@ async function run() {
                 return res.send({ accessToken: token });
             }
             res.status(401).send({ accessToken: 'unAuthorized' });
-        })
+        });
+
+        app.get('/users/admin/:email', async(req, res) => {
+            const email = req.params.email;
+            const query = {email: email};
+            const users = await usersCollection.findOne(query);
+            res.send({isAdmin: users?.role === 'admin'});
+        });
 
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -96,22 +103,38 @@ async function run() {
             res.send(users);
         });
 
-        app.put('/users/admin', async (req, res) => {
+        app.put('/users/admin', veryfyJWT, async (req, res) => {
+            // email Query Role Check
+            const decodedEmail = req.decoded.email;
+            const query = {email: decodedEmail};
+            const userRole = await usersCollection.findOne(query);
+            if(userRole?.role !== 'admin'){
+                return res.status(403).send({message: 'forbidden access'});
+            }
+
+            // email Query user
             const email = req.query.email;
-            const query = { email: email };
-            const users = await usersCollection.findOne(query);
+            const filter = { email: email };
+            const users = await usersCollection.findOne(filter);
             if (!users) {
                 return res.status(401).send({message: 'First Create this email account.'})
             }
+            
             const optios = { upsert: true };
             const updatedDoc = {
                 $set: {
                     role: 'admin'
                 }
             }
-            const result = await usersCollection.updateOne(query, updatedDoc, optios);
+            const result = await usersCollection.updateOne(filter, updatedDoc, optios);
             res.send(result);
         });
+
+        app.get('/orders', async(req, res) => {
+            const query = {};
+            const orders = await bookingCollection.find(query).toArray();
+            res.send(orders);
+        })
 
     }
     finally {
