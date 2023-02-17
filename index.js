@@ -56,6 +56,35 @@ async function run() {
             res.send(services);
         });
 
+        app.post('/services', async (req, res) => {
+            const service = req.body;
+            const result = await servicesProductCollection.insertOne(service);
+            res.send(result);
+        });
+
+        app.put('/services/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const service = req.body;
+            const option = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    productName: service.productName,
+                    price: service.price,
+                    productDescription: service.productDescription
+                }
+            }
+            const result = await servicesProductCollection.updateOne(filter, updatedDoc, option);
+            res.send(result); 
+        });
+
+        app.delete('/services/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await servicesProductCollection.deleteOne(filter);
+            res.send(result);
+        })
+
         app.get('/bookings', veryfyJWT, async (req, res) => {
             const email = req.query.email;
             const decodeEmail = req.decoded.email;
@@ -90,11 +119,11 @@ async function run() {
             res.status(401).send({ accessToken: 'unAuthorized' });
         });
 
-        app.get('/users/admin/:email', async(req, res) => {
+        app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email: email};
+            const query = { email: email };
             const users = await usersCollection.findOne(query);
-            res.send({isAdmin: users?.role === 'admin'});
+            res.send({ isAdmin: users?.role === 'admin' });
         });
 
         app.post('/users', async (req, res) => {
@@ -106,10 +135,10 @@ async function run() {
         app.put('/users/admin', veryfyJWT, async (req, res) => {
             // email Query Role Check
             const decodedEmail = req.decoded.email;
-            const query = {email: decodedEmail};
+            const query = { email: decodedEmail };
             const userRole = await usersCollection.findOne(query);
-            if(userRole?.role !== 'admin'){
-                return res.status(403).send({message: 'forbidden access'});
+            if (userRole?.role !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' });
             }
 
             // email Query user
@@ -117,9 +146,9 @@ async function run() {
             const filter = { email: email };
             const users = await usersCollection.findOne(filter);
             if (!users) {
-                return res.status(401).send({message: 'First Create this email account.'})
+                return res.status(401).send({ message: 'Email Not Exist !' })
             }
-            
+
             const optios = { upsert: true };
             const updatedDoc = {
                 $set: {
@@ -130,11 +159,25 @@ async function run() {
             res.send(result);
         });
 
-        app.get('/orders', async(req, res) => {
+        app.get('/admin/orders', async (req, res) => {
             const query = {};
             const orders = await bookingCollection.find(query).toArray();
             res.send(orders);
-        })
+        });
+
+        app.put('/admin/orders/:id', async(req, res) => {
+            const id = req.params.id;
+            const filter = {_id: new ObjectId(id)};
+            const status = req.body;
+            const option = {upsert: true};
+            const updatedDoc = {
+                $set: {
+                    status: status.status
+                }
+            }
+            const result = await bookingCollection.insertOne(filter, updatedDoc, option);
+            res.send(result);
+        });
 
     }
     finally {
