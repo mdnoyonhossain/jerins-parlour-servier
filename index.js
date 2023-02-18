@@ -159,6 +159,13 @@ async function run() {
             res.send(result);
         });
 
+        app.get('/admin/book/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const book = await bookingCollection.findOne(query);
+            res.send(book)
+        })
+
         app.get('/admin/orders', async (req, res) => {
             const query = {};
             const orders = await bookingCollection.find(query).toArray();
@@ -175,9 +182,16 @@ async function run() {
                     status: status.status
                 }
             }
-            const result = await bookingCollection.insertOne(filter, updatedDoc, option);
+            const result = await bookingCollection.updateOne(filter, updatedDoc, option);
             res.send(result);
         });
+
+        app.delete('/admin/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = {_id: new ObjectId(id)};
+            const result = await bookingCollection.deleteOne(filter);
+            res.send(result);
+        })
 
     }
     finally {
