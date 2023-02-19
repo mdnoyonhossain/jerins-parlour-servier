@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
+const stripe = require("stripe")(process.env.SECRET_STRIP_KEY);
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -36,6 +37,7 @@ async function run() {
         const bookingCollection = client.db('jerinsParlor').collection('bookings');
         const reviewCollection = client.db('jerinsParlor').collection('reviews');
         const usersCollection = client.db('jerinsParlor').collection('users');
+        const paymentsCollection = client.db('jerinsParlor').collection('payment');
 
         app.get('/services', async (req, res) => {
             const query = {};
@@ -102,6 +104,38 @@ async function run() {
             res.send(result);
         });
 
+        app.post('/create-payment-intent', async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            const result = await paymentsCollection.insertOne(payment);
+            const id = payment.bookingId
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const updatedResult = await bookingCollection.updateOne(filter, updatedDoc)
+            res.send(result);
+        })
+
         app.post('/reviews', async (req, res) => {
             const review = req.body;
             const result = await reviewCollection.insertOne(review);
@@ -113,7 +147,7 @@ async function run() {
             const query = { email: email };
             const users = await usersCollection.findOne(query);
             if (users) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1d' });
                 return res.send({ accessToken: token });
             }
             res.status(401).send({ accessToken: 'unAuthorized' });
