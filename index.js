@@ -77,7 +77,7 @@ async function run() {
                 }
             }
             const result = await servicesProductCollection.updateOne(filter, updatedDoc, option);
-            res.send(result); 
+            res.send(result);
         });
 
         app.delete('/services/:id', async (req, res) => {
@@ -136,11 +136,30 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/reviews', async (req, res) => {
+            const query = {};
+            const result = await reviewCollection.find(query).limit(3).toArray();
+            res.send(result)
+        });
+
+        app.get('/more-testimonials', async (req, res) => {
+            const query = {};
+            const result = await reviewCollection.find(query).toArray();
+            res.send(result)
+        });
+ 
         app.post('/reviews', async (req, res) => {
             const review = req.body;
             const result = await reviewCollection.insertOne(review);
             res.send(result);
         });
+
+        app.delete('/reviews/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await reviewCollection.deleteOne(filter);
+            res.send(result)
+        })
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
@@ -195,7 +214,7 @@ async function run() {
 
         app.get('/admin/book/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const book = await bookingCollection.findOne(query);
             res.send(book)
         })
@@ -206,11 +225,11 @@ async function run() {
             res.send(orders);
         });
 
-        app.put('/admin/orders/:id', async(req, res) => {
+        app.put('/admin/orders/:id', async (req, res) => {
             const id = req.params.id;
-            const filter = {_id: new ObjectId(id)};
+            const filter = { _id: new ObjectId(id) };
             const status = req.body;
-            const option = {upsert: true};
+            const option = { upsert: true };
             const updatedDoc = {
                 $set: {
                     status: status.status
@@ -222,7 +241,7 @@ async function run() {
 
         app.delete('/admin/order/:id', async (req, res) => {
             const id = req.params.id;
-            const filter = {_id: new ObjectId(id)};
+            const filter = { _id: new ObjectId(id) };
             const result = await bookingCollection.deleteOne(filter);
             res.send(result);
         })
